@@ -19,6 +19,7 @@ void extendedPrintf(customType* s){
         case ValidFloat: printf("%d",s->flnum); break;
         case ErrCode: printf("Error: %s",s->err); break;
         case ValidIdentifier: printf("%s",s->id); break;
+        case ValidFunction: printf('<function>'); break;
         case ValidSExpression: exprPrint(s,'(',')'); break;
         case ValidQExpression: exprPrint(s,'{','}'); break;
     }
