@@ -1,6 +1,7 @@
 #include "types.c"
 #include <stdio.h>
 #include <stdlib.h>
+#include "readAST.c"
 
 //expression evaluation helpers
 
@@ -78,7 +79,7 @@ customType* sexprEvalHelper(env* e, customType* root){
    if(first->type!=ValidFunction){blockDel(first); blockDel(root); return typeErr("Expresion does not begin with a valid identifier/command");}
    
    //assuming that the first element is a valid command and/or identifier, we may compute it, free the memory that is no longer need and return the result
-   customType* result = first->func(e, root);
+   customType* result = callFunction(e, f, root);
    blockDel(first);
    return result;
 
@@ -336,7 +337,7 @@ customType* def(env* e, customType* arg){
     return blockCons();
 }
 
-//builting function for printing all names in an enviorment
+//builtin function for printing all names in an enviorment
 customType* printCurrentEnv(env* e){
     for(int i=0;i<e->count;i++){
         printf("%s : %d",e->ids[i],e->values[i]);
@@ -344,4 +345,96 @@ customType* printCurrentEnv(env* e){
     return blockCons();
 }
 
+customType* global(env* e, customType* arg){return envAddHelper(e,arg,"static");}
+customType* let(env* e, customType* arg){return envAddHelper(e,arg,"let");}
 
+customType* envAddHelper(env* e, customType* arg, char* f){
+    if(arg->block[0]->type!=ValidQExpression){
+        blockDel(arg); return typeErr("incorrect type passed");
+    }
+    customType* idens = arg->block[0];
+    for(int i = 0; i < idens->count;i++){
+        if(idens->block[i]->type!=ValidIdentifier){
+            blockDel(arg); return typeErr("cannot bind non identifier");
+        }
+    }
+    for(int i=0;i<idens->count;i++){
+        if(!strcmp(f,"static")){globalEnvAdd(e,idens->block[i],arg->block[i+1]);}
+        if(!strcmp(f,"let")){envAdd(e,idens->block[i],arg->block[i+1]);}
+    }
+    blockDel(arg);
+    return blockCons();
+}
+
+
+
+//builtin lambda function for funtional programming compatibility (anonymous functions)
+//arg is a list of 2 arguments: the params and the body
+customType* lambda(env* e, customType* arg){
+    //error checking cases
+    if(arg->count!=2){return typeErr("incorrect number of arguments");}
+    if(arg->block[0]->type!=ValidQExpression){return typeErr("incorrect type of arguments");}
+    if(arg->block[0]->type!=ValidQExpression){return typeErr("incorrect type of arguments");}
+
+    //ensure that the paraments are identifiers (we do not allow primitive type literals to constitute the type signature of the lambda function)
+    for(int i=0;i<arg->block[0]->count;i++){
+        if(arg->block[0]->block[i]->type!=ValidQExpression){
+            return typeErr("cannot bind non identifier");
+        }
+    }
+
+    //use lamda consturctor to return a pointer to the user defined function
+    customType* params = pop(arg,0);
+    customType* body = pop(arg,0);
+    blockDel(arg);
+    return typeLambda(params,body);
+    
+}
+
+//evaluate calls to user defined functions
+customType* callFunction(env* e, customType* f, customType* args){
+    if(f->func){return f->func(e,args);} //if builtin, simply call it
+
+    //otherwise check the argument count and add parameters to the function enviorment and set the current enviorment as the parent enviorment of the funciton enviorment
+    while(arg->count){
+        if(f->parameters->count == 0){blockDel(arg); return typeErr("too many arguments passed");}
+        
+        customType* name = pop(f->parameters,0);
+        if(!strcmp(name->id,'&')){
+            if(f->parameters->count!=1){
+                blockDel(arg); return typeErr("incorrect function format");
+            }
+            customType* optionalArgument = pop(f->parameters,0);
+            envAdd(f->e,optionalArgument,list(e,args));
+            blockDel(name); blockDel(optionalArgument);
+            break;
+        }
+        customType* value = pop(a->parameters,0);
+        
+        envAdd(f->e,name,value);
+        blockDel(name);blockDel(value);
+    }
+    blockDel(args);
+
+    if(f->parameters->count > 0 && !strcmp(f->parameters->block[0]->id,'&')){
+        if(f->parameters->count != 2){
+            return typeErr("incorrect function format");
+        }
+        blockDel(pop(f->parameters,0));
+        customType* name = pop(f->parameters,0);
+        customType* value = qExprCons();
+        envAdd(f->e,name,value);
+        blockDel(name);blockDel(value);
+    }
+
+    if(f->parameters->count == 0){
+        f->e->parent=e;
+        return evalQexpr(f->e,concatinate(blockCons(), blkCopy(f->functionBody)));
+
+    }else{
+        return blkCopy(f);
+    }
+    
+
+
+}

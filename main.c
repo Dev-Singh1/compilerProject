@@ -50,6 +50,9 @@ void builtinFunctionAdd(env* e){
     builtinFunctionAddHelper(e, "+", add);
     builtinFunctionAddHelper(e, "-", sub);
     builtinFunctionAddHelper(e, "%%", mod);
+    builtinFunctionAddHelper(e, "\\", lambda); //using backslash to represent lambda
+    builtinFunctionAddHelper(e, "static", global);
+    builtinFunctionAddHelper(e, "let", let);
 }
 
 int main(int argc, char** argv){

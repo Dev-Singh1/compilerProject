@@ -2,8 +2,8 @@
 
 
 //we must now create our own print function(s) to handle the custom type
-void exprPrint(customType* s, char iden, char close){
-    putchar(iden);
+void exprPrint(customType* s, char open, char close){
+    putchar(open);
     for(int i = 0; i<s->count;i++){
         extendedPrintf(s->block[i]);
         //skip spacer if at last element; for output readabliity
@@ -19,7 +19,12 @@ void extendedPrintf(customType* s){
         case ValidFloat: printf("%d",s->flnum); break;
         case ErrCode: printf("Error: %s",s->err); break;
         case ValidIdentifier: printf("%s",s->id); break;
-        case ValidFunction: printf('<function>'); break;
+        case ValidFunction:
+            if(s->func !=NULL){
+                printf('<Builtin Function>'); break;
+            }else{
+                printf('<User Defined Function>'); break;
+            }
         case ValidSExpression: exprPrint(s,'(',')'); break;
         case ValidQExpression: exprPrint(s,'{','}'); break;
     }
