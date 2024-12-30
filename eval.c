@@ -308,6 +308,193 @@ customType* div(env* e, customType* a) {
 customType* mod(env* e, customType* a) {
   return arithmaticHelper(e, a, "%%");
 }
+//comparison operator builtins
+customType* geq(env e* customType* args){
+    if(args->count!=2){blockDel(args);return typeErr("incorrect number of arguments");}
+    customType* first = args->block[0];
+    customType* second = args->block[1];
+    switch(first->type){
+        case ValidNum:
+            switch(second->type){
+                case ValidNum:int x = first->num >= second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: int x = first->num >= second->flnum; blockDel(first); blockDel(second); blockDel(args);  return typeNum(x);
+                default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
+            }break;
+        case ValidFloat:
+            switch(second->type){
+                case ValidNum: int x = first->flnum >= second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: int x = first->flnum >= second->flnum; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
+            }break;
+        default: blockDel(first); blockDel(second); blockDel(args); reutrn typeErr("incorrect arguements");
+    }
+}
+customType* gt(env e* customType* args){
+    if(args->count!=2){blockDel(args);return typeErr("incorrect number of arguments");}
+    customType* first = args->block[0];
+    customType* second = args->block[1];
+    switch(first->type){
+        case ValidNum:
+            switch(second->type){
+                case ValidNum:int x = first->num > second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: int x = first->num > second->flnum; blockDel(first); blockDel(second); blockDel(args);  return typeNum(x);
+                default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
+            }break;
+        case ValidFloat:
+            switch(second->type){
+                case ValidNum: int x = first->flnum > second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: int x = first->flnum > second->flnum; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
+            }break;
+        default: blockDel(first); blockDel(second); blockDel(args); reutrn typeErr("incorrect arguements");
+    }
+}
+customType* leq(env e* customType* args){
+    if(args->count!=2){blockDel(args);return typeErr("incorrect number of arguments");}
+    customType* first = args->block[0];
+    customType* second = args->block[1];
+    switch(first->type){
+        case ValidNum:
+            switch(second->type){
+                case ValidNum:int x = first->num <= second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: int x = first->num <= second->flnum; blockDel(first); blockDel(second); blockDel(args);  return typeNum(x);
+                default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
+            }break;
+        case ValidFloat:
+            switch(second->type){
+                case ValidNum: int x = first->flnum <= second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: int x = first->flnum <= second->flnum; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
+            }break;
+        default: blockDel(first); blockDel(second); blockDel(args); reutrn typeErr("incorrect arguements");
+    }
+}
+customType* lt(env e* customType* args){
+    if(args->count!=2){blockDel(args);return typeErr("incorrect number of arguments");}
+    customType* first = args->block[0];
+    customType* second = args->block[1];
+    switch(first->type){
+        case ValidNum:
+            switch(second->type){
+                case ValidNum:int x = first->num < second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: int x = first->num < second->flnum; blockDel(first); blockDel(second); blockDel(args);  return typeNum(x);
+                default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
+            }break;
+        case ValidFloat:
+            switch(second->type){
+                case ValidNum: int x = first->flnum < second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: int x = first->flnum < second->flnum; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
+            }break;
+        default: blockDel(first); blockDel(second); blockDel(args); reutrn typeErr("incorrect arguements");
+    }
+}
+
+customType* eq(env* e, customType* first, customType* second){
+    switch(first->type){
+        case ValidNum:
+            switch(second->type){
+                case ValidNum:int x = first->num == second->num; blockDel(first); blockDel(second);  return typeNum(x);
+                case ValidFloat: int x = first->num == second->flnum; blockDel(first); blockDel(second);  return typeNum(x);
+                default: blockDel(first); blockDel(second); return typeNum(0);
+            }break;
+        case ValidFloat:
+            switch(second->type){
+                case ValidNum: int x = first->flnum == second->num; blockDel(first); blockDel(second); return typeNum(x);
+                case ValidFloat: int x = first->flnum == second->flnum; blockDel(first); blockDel(second); return typeNum(x);
+                default: blockDel(first); blockDel(second); return typeNum(0);
+            }break;
+        case ErrCode:
+            switch(second->type){
+                case ErrCode: int x = (strcmp(first->err,second->err)==0); blockDel(first); blockDel(second); return typeNum(x); 
+                default: blockDel(first); blockDel(second); return typeNum(0);
+            }break;
+        case ValidIdentifier:
+            switch(second->type){
+                case ValidIdentifier: int x = (strcmp(first->id,second->id)==0); blockDel(first); blockDel(second); return typeNum(x); 
+                default: blockDel(first); blockDel(second); return typeErr("inccrrect argumetns");
+            }break;
+        case ValidFunction:
+            switch(second->type){
+                case ValidFunction: 
+                    if(first->func || second->func){
+                        blockDel(first); blockDel(second); return typeNum(first->func==second->func);
+
+                    }else{
+                        blockDel(first); blockDel(second); return typeNum(eq(e, first->parameters, second->parameters)&&eq(e,first->functionBody,second->functionBody));
+                    }
+                default: blockDel(first); blockDel(second); return typeNum(0);
+            }break;
+        // compare lists
+        case ValidQExpression:
+        case ValidSExpression:
+            if(first->count != second->count){blockDel(first); blockDel(second); return typeNum(0);}
+            for (int i = 0; i < first->count; i++){
+                if(!(eq(first->block[i],second->block[i]))){blockDel(first); blockDel(second); return typeNum(0);}
+            }
+            blockDel(first); blockDel(second); return typeNum(1);
+        break;
+            
+        default: blockDel(first); blockDel(second); return typeNum(0);
+    }
+}
+customType* neq(env* e, customType* args){
+    if(args->count!=2){return typeErr("incorrect number of arguments");}
+    customType* answer = eq(e,args-block[0],args->block[1]);
+    blockDel(args);
+    switch(answer->type){
+        case ErrCode: return answer;
+        default: return typeNum(!(answer->num));
+    }
+}// neq is the same as not(eq)/!eq
+
+customType* notFunction(env* e, customType* args ){
+    if(args->count!=1){
+        return typeErr("too few arguments");
+    }
+    else if(args->block[0]->type!=ValidNum){
+        return typeErr("valid conditional required");
+    }
+    switch(args->block[0]->num){
+        case 0: blockDel(args); return typeNum(1);
+        case 1: blockDel(args); return typeNum(0);
+    }
+
+}
+
+customType* andFunction(env* e, customType* args){
+    if(args->count!=2){
+        return typeErr("too few arguments");
+    }
+    else if(args->block[0]->type!=ValidNum&&args->block[1]->type!=ValidNum){
+        return typeErr("valid conditional required");
+    }
+    int first=args->block[0]->num;
+    int second=arg->block[1]->num;
+    int answer = first && second;
+    blockDel(args);
+    return typeNum(answer);
+}
+
+customType* orFunction(env* e, customType* args){
+    if(args->count!=2){
+        return typeErr("too few arguments");
+    }
+    else if(args->block[0]->type!=ValidNum&&args->block[1]->type!=ValidNum){
+        return typeErr("valid conditional required");
+    }
+    int first=args->block[0]->num;
+    int second=arg->block[1]->num;
+    int answer = first || second;
+    blockDel(args);
+    return typeNum(answer);
+
+}
+
+
+
+
+
 
 //builtin function for defining and declaring
 customType* def(env* e, customType* arg){
@@ -400,7 +587,7 @@ customType* callFunction(env* e, customType* f, customType* args){
         if(f->parameters->count == 0){blockDel(arg); return typeErr("too many arguments passed");}
         
         customType* name = pop(f->parameters,0);
-        if(!strcmp(name->id,'&')){
+        if(!strcmp(name->id,'&')){ //if & is found, enter edge case of varible arguments
             if(f->parameters->count!=1){
                 blockDel(arg); return typeErr("incorrect function format");
             }
@@ -437,4 +624,24 @@ customType* callFunction(env* e, customType* f, customType* args){
     
 
 
+}
+
+
+//builtin if 
+customType* ifFunction(env* e, customType* args){
+    if(args->count!=3){
+        return typeErr("too few arguments");
+    }
+    else if(args->block[0]->type!=ValidNum){
+        return typeErr("valid conditional required");
+    }
+    else if(args->block[1]->type!=ValidQExpression || args->block[2]->type!=ValidQExpression){
+        return typeErr("evaluable exprssions required");
+
+    }
+    customType* ans;
+    switch(arg->block[0]->num){
+        case 1: ans=recursiveHelper(e,pop(arg,1)); blockDel(args); return ans;
+        case 0: ans=recursiveHelper(e,pop(arg,2)); blockDel(args); return ans;;
+    }
 }
