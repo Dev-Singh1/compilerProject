@@ -8,6 +8,7 @@
 
 static char buffer[2048];
 
+//readline and add_history function definition for WIN32 systems
 char* readline(char* prompt) {
   fputs(prompt, stdout);
   fgets(buffer, 2048, stdin);
@@ -68,17 +69,19 @@ struct env{
 
 //funcitons to convert primitive types to our customType (list cells and constituent tokens)
 customType* typeNum(long x){
-    customType* result = malloc(sizeof(customType));
+    customType* result = malloc(sizeof(customType)); //allocate memory for the object
+    //set its type and value
     result->type = ValidNum;
     result->num = x;
-    return result;
+    return result; //return the created object
 }
 
 customType* typeFloat(double x){
-    customType* result = malloc(sizeof(customType));
+    customType* result = malloc(sizeof(customType));//allocate memory for the object
+    //set its type and value
     result->type = ValidFloat;
     result->flnum = x;
-    return result;
+    return result; //return the created object
 }
 // err function now uses a variable argument list
 customType* typeErr(char* x, ...){
@@ -103,36 +106,41 @@ customType* typeErr(char* x, ...){
 }
 
 customType* typeIdentifier(char* x){
-    customType* result = malloc(sizeof(customType));
+    customType* result = malloc(sizeof(customType));//allocate memory for the object
+    //set its type and value
     result->type = ValidIdentifier;
     result->id = malloc(strlen(x)+1);
     strpy(result->id, x);
-    return result;
+    return result;//return the created object
 }
 
 customType* typeFunction(funcPtr f){
-    customType* result = malloc(sizeof(customType));
+    customType* result = malloc(sizeof(customType));//allocate memory for the object
+    //set its type and value
     result->type = ValidFunction;
     result->func = f;
-    return result;
+    return result;//return the created object
 }
 //constructor for user defined functions
 customType* typeLambda(customType* params, customType* body){
-    customType* result = malloc(sizeof(customType));
+    customType* result = malloc(sizeof(customType));//allocate memory for the object
+    //set its type and value(s)
     result->type = ValidFunction;
     result->e = newEnv();
     result->parameters = params;
     result->functionBody = body;
     result->func = NULL;
-    return result;
+    return result;//return the created object
 
 } 
 customType* typeStr(char* str){
-    customType* result = malloc(sizeof(customType*));
+    customType* result = malloc(sizeof(customType*));//allocate memory for the object
+    //set its type and value
     result->type=ValidString;
+    //using malloc and strcpy to set the value of result->str to be the desired stirng, because it would otherwise be a pointer to that string
     result->str = malloc(strlen(str)+1);
     strcpy(result->str,str);
-    return result;
+    return result;//return the created object
 
 }
 
@@ -140,20 +148,22 @@ customType* typeStr(char* str){
 
 //sExpr constructor
 customType* blockCons(void){ //creates an empty list block and returns a pointer to it
-    customType* result = malloc(sizeof(customType));
+    customType* result = malloc(sizeof(customType));//allocate memory for the object
+    //set its type and value(s)
     result->type = ValidSExpression;
     result->count = 0;
     result->block = NULL;
-    return result;
+    return result;//return the created object
 }
 
 //qExpr consturctor
 customType* qExprCons(void){ //creates an empty list block and returns a pointer to it
-    customType* result = malloc(sizeof(customType));
+    customType* result = malloc(sizeof(customType));//allocate memory for the object
+    //set its type and value(s)
     result->type = ValidQExpression;
     result->count = 0;
     result->block = NULL;
-    return result;
+    return result;//return the created object
 }
 
 
@@ -193,8 +203,9 @@ void blockDel(customType* x){ //deletes list block and returns nothing
 
 //helper function that makes a copy of the provided target
 customType* blkCopy(customType* target){
-    customType* result = malloc(sizeof(customType));
-    result->type=target->type;
+    customType* result = malloc(sizeof(customType)); //allocate memory for the copy
+    result->type=target->type; //equate types
+    //copy appropriate value(s) based on type
     switch (target->type){
         case ValidFunction:
             if(target->func!=NULL){
@@ -221,24 +232,27 @@ customType* blkCopy(customType* target){
             }
             break;
     }
-    return result;
+    return result; //return the copy
 }
 
 //enviorment helper functions
 env* newEnv(void){
-    env* e = malloc(sizeof(env));
-    e->parent=NULL;
-    e->count=0;
-    e->ids=NULL;
-    e->values=NULL;    
-    return e;
+    env* e = malloc(sizeof(env)); //allocate memory for the eviorment object
+    //set its value(s)
+    e->parent=NULL;//pointer to parnet env
+    e->count=0;//count of number of identifier stored in the enviornment
+    e->ids=NULL;//pointer to list of names
+    e->values=NULL; //pointer to list of values   
+    return e; //return the enviorment object
 }
 
 env* delEnv(env* e){
+    //in the given enviornment, loop over all variables and identifiers stored in the enviornmnet and free them
     for(int i=0;i<e->count;i++){
         free(e->ids[i]);
         blockDel(e->values[i]);
     }
+    //free the pointers as well
     free(e->ids);
     free(e->values);
     free(e);
@@ -284,17 +298,20 @@ void globalEnvAdd(env* e, customType* name, customType* value){
 }
 //function to create a copy of the provided enviorment
 env* envCopy(env* e){
-    env* result = malloc(sizeof(env));
-    result->parent = e->parent;
-    result->count = e->count;
-    result->ids = malloc(sizeof(char*)*result->count);
+    env* result = malloc(sizeof(env)); //allocate space for the copy
+    
+    result->parent = e->parent; //equate parent pointers
+    result->count = e->count; //equate counts
+    //allocate space for copies of all values stored in this enviornment
+    result->ids = malloc(sizeof(char*)*result->count); 
     result->values = malloc(sizeof(customType*)*result->count);
+    //loop over all values in the enviornment and use the value copying functuion to make a copy of the value and add it the the env copy
     for(int i=0;i<e->count;i++){
         result->ids[i] = malloc(strlen(e->ids[i])+1);
         strcpy(result->ids[i],e->ids[i]);
         result->values[i] = blkCopy(e->values[i]);
     }
-    return result;
+    return result;//return env copy
 }
 
 
@@ -318,13 +335,13 @@ customType* pop(customType* node, int i) {
 
 customType* popAndDel(customType* node, int i) {
   customType* value = pop(node, i);
-  blockDel(node);
+  blockDel(node);//after poping the desired element from the given list delete the rest of the list
   return value;
 }
 
 
 
-
+//helper for recursive evaluation of s expr lists
 customType* recursiveHelper(env* e, customType* node){
     if(node->type == ValidIdentifier){
         customType* x = envGet(e,node);
@@ -508,6 +525,7 @@ customType* list(env* e, customType* lst){ // takes the given list and converts 
     return lst;
 
 }
+//evaluation helper for all expressions that are not s exprs
 customType* evalQexpr(env* e, customType* lst){
     if(lst->count!=1){blockDel(lst);return typeErr("Too many arguments passed to eval!");}
     if(lst->type!=ValidQExpression){blockDel(lst);return typeErr("eval can only iderate on QExpressions");}
@@ -568,6 +586,7 @@ customType* init(env* e, customType* lst){
     blockDel(pop(result,result->count-1));
     return result;
 }
+//arithmatic wrappers
 customType* add(env* e, customType* a) {
   return arithmaticHelper(e, a, "+");
 }
@@ -591,6 +610,7 @@ customType* geq(env e* customType* args){
     if(args->count!=2){blockDel(args);return typeErr("incorrect number of arguments");}
     customType* first = args->block[0];
     customType* second = args->block[1];
+    //switch case to match types and return appropriate values
     switch(first->type){
         case ValidNum:
             switch(second->type){
@@ -611,6 +631,7 @@ customType* gt(env e* customType* args){
     if(args->count!=2){blockDel(args);return typeErr("incorrect number of arguments");}
     customType* first = args->block[0];
     customType* second = args->block[1];
+    //switch case to match types and return appropriate values
     switch(first->type){
         case ValidNum:
             switch(second->type){
@@ -631,6 +652,7 @@ customType* leq(env e* customType* args){
     if(args->count!=2){blockDel(args);return typeErr("incorrect number of arguments");}
     customType* first = args->block[0];
     customType* second = args->block[1];
+    //switch case to match types and return appropriate values
     switch(first->type){
         case ValidNum:
             switch(second->type){
@@ -651,6 +673,7 @@ customType* lt(env e* customType* args){
     if(args->count!=2){blockDel(args);return typeErr("incorrect number of arguments");}
     customType* first = args->block[0];
     customType* second = args->block[1];
+    //switch case to match types and return appropriate values
     switch(first->type){
         case ValidNum:
             switch(second->type){
@@ -669,6 +692,7 @@ customType* lt(env e* customType* args){
 }
 
 customType* eq(env* e, customType* first, customType* second){
+    //switch case to match types and return appropriate values
     switch(first->type){
         case ValidNum:
             switch(second->type){
@@ -738,6 +762,7 @@ customType* notFunction(env* e, customType* args ){
     else if(args->block[0]->type!=ValidNum){
         return typeErr("valid conditional required");
     }
+    //switch case to match types and return appropriate values
     switch(args->block[0]->num){
         case 0: blockDel(args); return typeNum(1);
         case 1: blockDel(args); return typeNum(0);
@@ -752,6 +777,7 @@ customType* andFunction(env* e, customType* args){
     else if(args->block[0]->type!=ValidNum&&args->block[1]->type!=ValidNum){
         return typeErr("valid conditional required");
     }
+    //operates on bools (represented internally by numbers 0 and 1)
     int first=args->block[0]->num;
     int second=arg->block[1]->num;
     int answer = first && second;
@@ -766,6 +792,7 @@ customType* orFunction(env* e, customType* args){
     else if(args->block[0]->type!=ValidNum&&args->block[1]->type!=ValidNum){
         return typeErr("valid conditional required");
     }
+    //operates on bools (represented internally by numbers 0 and 1)
     int first=args->block[0]->num;
     int second=arg->block[1]->num;
     int answer = first || second;
@@ -817,8 +844,9 @@ customType* printCurrentEnv(env* e){
 
 customType* global(env* e, customType* arg){return envAddHelper(e,arg,"static");}
 customType* let(env* e, customType* arg){return envAddHelper(e,arg,"let");}
-
+//helper that differentiates between adding to current local scope or global scope and call the appropraite env add functions
 customType* envAddHelper(env* e, customType* arg, char* f){
+
     if(arg->block[0]->type!=ValidQExpression){
         blockDel(arg); return typeErr("incorrect type passed");
     }
