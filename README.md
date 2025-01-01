@@ -1,82 +1,103 @@
-### README for Lisp-Inspired Compiler Project
-This project is a custom compiler for a simple programming language inspired by the syntax and principles of ANSI Common Lisp. The language is designed to be expression-oriented and uses a formulaic syntax for clarity and simplicity. This repository contains the source code for the compiler, written in C, using the **mpc** (Micro Parser Combinator) library for parsing.
+### README 
+
+# Lisp-Inspired Compiler
+
+This project is a custom compiler for a simple programming language inspired by the syntax and principles of ANSI Common Lisp. The language is designed to be expression-oriented and supports a rich set of features, including functional programming constructs, dynamic scoping, and various primitive operations.
 
 ## Features
 
-- **Lisp-Like Syntax**: The language supports arithmetic expressions enclosed in parentheses, such as `(+ 1 2)` or `(* 3 (- 4 2))`.
-- **Recursive Evaluation**: Expressions are evaluated recursively, enabling the use of nested operations.
-- **Arithmetic Operators**: Basic arithmetic operators (`+`, `-`, `*`, `/`) are supported.
-- **Custom Grammar**: The grammar is defined using `mpc`, making it easy to expand the language in the future.
+- **Extended Syntax**:
+  - Added support for floating-point numbers, strings, and comments.
+  - Included quoted expressions (`qexpr`) for evaluating blocks without immediate execution.
+- **Functional Programming**:
+  - Support for anonymous functions (lambdas) and user-defined functions.
+  - Functional primitives like `head`, `tail`, `join`, and `cons`.
+- **Arithmetic and Logical Operations**:
+  - Basic arithmetic (`+`, `-`, `*`, `/`, `mod`).
+  - Comparison operators (`>`, `>=`, `<`, `<=`, `==`, `!=`).
+  - Logical operators (`and`, `or`, `not`).
+- **Environment and Scope**:
+  - Local (`let`) and global (`static`) variable declaration.
+  - Recursive evaluation with dynamic scoping.
+- **Control Flow**:
+  - Conditional execution with the `if` operator.
+- **Error Handling**:
+  - Graceful error reporting for invalid input or runtime issues.
+- **Interactivity**:
+  - REPL (Read-Eval-Print Loop) with history support.
+  - Ability to load and execute scripts from files.
 
 ## Getting Started
 
 ### Prerequisites
 
-- GCC or any C compiler
-- The `mpc` library: [https://github.com/orangeduck/mpc](https://github.com/orangeduck/mpc)
+- GCC or any C compiler supporting the C99 standard.
+- The `mpc` library: [https://github.com/orangeduck/mpc](https://github.com/orangeduck/mpc).
+- `editline` library for command-line editing and history (optional, for UNIX systems).
 
 ### Installation
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/lisp-inspired-compiler.git
-   cd lisp-inspired-compiler
+   git clone https://github.com/Dev-Singh1/compilerProject.git
+   cd compilerProject
    ```
 
-2. Install the `mpc` library:
-   Follow the installation instructions in the [mpc repository](https://github.com/orangeduck/mpc).
+2. Install dependencies:
+   Follow the installation instructions for the [mpc library](https://github.com/orangeduck/mpc) and `editline`.
 
 3. Compile the program:
    ```bash
-   gcc -std=c99 -Wall -o compiler compiler.c mpc.c
+   gcc -std=c99 -Wall -o compiler main.c mpc.c -ledit -lm
    ```
 
 ### Usage
 
-1. Run the compiled program:
+1. Run the compiler interactively:
    ```bash
    ./compiler
    ```
+   Use the REPL to enter expressions and view results.
 
-2. Enter expressions in the REPL:
-   ```
-   > (+ 1 2)
-   output: 3
-   > (* 3 (- 4 2))
-   output: 6
+2. Load and execute a script file:
+   ```bash
+   ./compiler script_file.lsp
    ```
 
-### Example Code
+### Example
 
-#### Input
+#### Input (REPL):
 ```lisp
-(+ 2 (* 3 4))
+> (+ 2 3)
+> (if (> 5 2) { (* 3 4) } { (/ 10 2) })
+> (\\ {x} {+ x 1}) 5
 ```
 
-#### Output
+#### Output:
+```lisp
+5
+12
+6
 ```
-output: 14
-```
 
-## Code Overview
+## Code Structure
 
-### `recursiveEvalHelper`
-
-A recursive function that traverses the abstract syntax tree (AST) to evaluate expressions.
-
-### `arithmaticHelper`
-
-Performs arithmetic operations based on the operator provided (`+`, `-`, `*`, `/`).
-
-### `main`
-
-Handles user input and parses it into an AST using `mpc`. If the input is valid, it evaluates the AST and prints the result.
+- **Core Types**:
+  - `customType`: Represents all expressions, numbers, strings, and functions.
+  - `env`: Represents the dynamic environment for scope management.
+- **Built-in Functions**:
+  - Arithmetic: `+`, `-`, `*`, `/`, `%`.
+  - Logical: `and`, `or`, `not`.
+  - Structural: `head`, `tail`, `join`, `cons`.
+  - Special: `if`, `def`, `\\` (lambda), `let`, `static`.
+- **Parser and AST**:
+  - Tokenizes and parses input using the `mpc` library.
+  - Converts input into Abstract Syntax Trees (ASTs).
 
 ## Roadmap
 
-- [ ] Add support for additional operators (e.g., modulus, power).
-- [ ] Implement error handling for division by zero and invalid syntax.
-- [ ] Introduce variables and assignment expressions.
-- [ ] Support functions and lambda expressions.
-- [ ] Create a proper standard library for common utilities.
----
+- [ ] Implement loops and iteration constructs.
+- [ ] Add file I/O operations.
+- [ ] Improve error handling
+- [ ] Enhance REPL with debugging tools.
+
