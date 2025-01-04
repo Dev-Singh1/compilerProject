@@ -494,7 +494,18 @@ customType* arithmaticHelper(env* e, customType* args, char* id){
 
 
 //builtin functions
+void show(env* e, customType* lst){
+    lst->str[strlen(str->lst)-1]='\0';
+   char* result = malloc(strlen(lst->str+1)+1);
+   strcpy(result,lst->str+1);
+   result = mpcf_unescape(result);
+   printf("%s",result);
+   free(result);
+   blockDel(lst); 
+}
+
 customType* head(env* e, customType* lst){ //equivalent to car
+    if(lst->type==ValidString){char x=lst->str[0];blockDel(lst);return x;}
     //base cases that causes errors
     if(lst->count!=1){blockDel(lst); return typeErr("Too many arguments given to head function");}
     if(lst->type != ValidQExpression){blockDel(lst); return typeErr("head function can only iderate on Qexpressions!");}
@@ -508,6 +519,7 @@ customType* head(env* e, customType* lst){ //equivalent to car
     return result;
 }
 customType* tail(env* e, customType* lst){ //equivalent to cdr
+    if(lst->type==ValidString){char* x=malloc(sizeof(lst->str));strncpy(x,lst->str+1,strlen(lst->str)-1);x[strlen(lst->str)-1]='\0';blockDel(lst);return x;}
     //base cases that causes errors
     if(lst->count!=1){blockDel(lst);return typeErr("Too many arguments passed to tail!");}
     if(lst->type!=ValidQExpression){blockDel(lst);return typeErr("tail can only iderate on QExpressions");}
@@ -536,8 +548,22 @@ customType* evalQexpr(env* e, customType* lst){
     return sexprEvalHelper(e,result);
 }
 customType* join(env* e, customType* lst){
-    for(int i=0;i<lst->count;i++){
-        if(lst->block[i]->type!=ValidQExpression){blockDel(lst);return typeErr("join can only iderate on QExpressions");}
+    if(lst->block[0]->type==ValidQExpression){
+        for(int i=0;i<lst->count;i++){
+            if(lst->block[i]->type!=ValidQExpression){
+                
+                blockDel(lst);
+                return typeErr("join can only iderate on QExpressions/Strings");
+            }
+        }
+    }else{
+        for(int i=0;i<lst->count;i++){
+            if(lst->block[i]->type!=ValidString){
+                
+                blockDel(lst);
+                return typeErr("join can only operate on QExpressions/String");
+            }
+        }
     }
     customType* result = pop(lst,0); //pop the first element
 
@@ -572,6 +598,12 @@ customType* cons(env* e, customType* x, customType* y){
 }
 int len(env* e, customType* lst){
     return lst->count;
+}
+customType* read(customType* s){
+    if(s->type!=ValidString){blockDel(s);return typeErr("excpected string");}
+    mpc_result_t ast;
+    mpc_parse("input",s->str,Program, &ast);
+    return readAll(ast.output);
 }
 customType* init(env* e, customType* lst){
     //base cases that causes errors
@@ -1034,7 +1066,7 @@ customType* readAll(mpc_ast_t* tree){
     //then fill that list
     for(int i=0;i<tree->children_num;i++){
         if(!strcmp(tree->childern[i],"regex") | !strcmp(tree->childern[i],"(") | !strcmp(tree->childern[i],")" | !strcmp(tree->childern[i],"{") | !strcmp(tree->childern[i],"}") | strstr(tree->children[i]->tag,"comment") ){continue;} //certain tokens are not syntatically meaningful and should be ignored
-        list = readHelper(list, readAll(tree->children[i])) // helper fucntion that helps fill the list (add elements to the lsit)
+        list = concatinate(list, readAll(tree->children[i])) // helper fucntion that helps fill the list (add elements to the lsit)
     }
     
 }
@@ -1045,7 +1077,23 @@ customType* concatinate(customType* l1, customType* l2){// takes 2 pointers, one
     // in lisp, car would return l1 while cdr would return l2; this explaination is how my mind understands using a dynamic array for the internal list represention
     return l1;
 }
+//need to add further error handling for file wrappers
+FILE* fopenwrapper(customType* f){
+    return fopen(f->block[0]->str,f->block[1]->str);
 
+}
+int fclosewrapper(FILE* f){
+    return fclose(f);
+
+}
+char* fgetswrapper(FILE* f){ 
+    char buff[2048];
+    return fgets(buff,sizeof(buff),f);
+}
+int fputswrapper(FILE* f,customType* data){
+    return fputs(data->block[0]->str,f);
+
+}
 
 //we must now create our own print function(s) to handle the custom type
 void exprPrint(customType* s, char open, char close){
@@ -1166,6 +1214,8 @@ void builtinFunctionAdd(env* e){
     builtinFunctionAddHelper(e, "load", load);
     builtinFunctionAddHelper(e, "print", printBuiltin);
     builtinFunctionAddHelper(e, "error", errorBuiltin);
+    builtinFunctionAddHelper(e,"show",show);
+    builtinFunctionAddHelper(e,"read",read);
 }
 
 int main(int argc, char** argv){
@@ -1191,9 +1241,9 @@ int main(int argc, char** argv){
             identifier : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;   \
             sexpr   : '(' <expr>* ')' \
             qexpr   : '{' <expr>* '}' \
-            expr     : <number> | <float> | '<sexpr>' ;\
+            expr     : <number> | <float> | <sexpr> | <qexpr> | <comment> | <string> | <identifier> ;\
             comment  : /;[^\\r\\n]*/ ; \
-            program    : /^/ <identifier> <expr>+ /$/ ;         \
+            program    : /^/ <expr>* /$/ ;         \
         ",
         Number, String, Float, Identifier, Sexpr, Qexpr, Expr, Comment, Program);
     
