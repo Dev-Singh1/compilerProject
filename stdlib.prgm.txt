@@ -1,0 +1,31 @@
+; Atoms
+(def {null} {})
+(def {True} {1})
+(def {False} {0})
+
+;macro to define functions
+(def {func} (\ {f b} {def (head f) (\ (tail f) b)}))
+
+;macros for packing/unpack and currying/uncurrying
+(func {pack f & xs} {f xs}) ;pack
+(func {unpack f l} {eval (join (list f) l)}) ;unpack
+(def {curry} {unpack})
+(def {uncurry} {pack})
+
+;create a new scope
+(func {newScope b} {((\ {_} b) ())})
+
+;The flip function takes a function f and two arguments a and b. It then applies f to a and b in the reversed order. This might be useful when we want a function to be partially evaluated. 
+(func {flip f a b} {f b a})
+
+;The comp function is used to compose two functions.
+(func {comp f g a} {f (g a)})
+
+;map and filter functionality
+(func {map f l} {if (== l null) {null} {join (list (f (eval (head l)))) (map f (tail l))}})
+
+(func {filter f l} {if (== l null) {null} {join (if (f (eval (head l))) {head l} {null}) (filter f (tail l))}})
+
+;iteration support
+(func {last l} {if (== (len l) 1) {(eval (head l))} {last (tail l)}})
+(func {do & l} {if (== l null) {null} {last l}})
