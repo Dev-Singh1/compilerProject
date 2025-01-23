@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "mpc.h"
+#include "uthash.h"
 
 //apparently, according to official documentation, readline and addhistory are function that dont exist on windows 32 bit so i have to define an edgecase in which I make my own if I am compling on/for a 32 bit windows system
 #ifdef _WIN32
@@ -32,8 +33,44 @@ struct env;
 typedef struct customType customType;
 typedef struct env env;
 
+//dictionary support
+typedef struct {
+    char key[255];
+    customType* value;
+    UT_hash_handle hh;
+}UserDefinedTypeHashMap;
+
+//dictionary add
+void addItemToDictionary(const char* key, customType* val, customType* dict){
+    UserDefinedTypeHashMap *item = (UserDefinedTypeHashMap *)malloc(sizeof(UserDefinedTypeHashMap));
+    if(item==NULL){
+        printf("Failed to allocate Memory");
+        return;
+    }
+    strcpy(item->key);
+    item->value=val;
+    HASH_ADD_STR(dict->map,key,item);
+    return;
+}
+
+//dictionary get
+UserDefinedTypeHashMap* getItem(const char* key, customType* dict){
+    UserDefinedTypeHashMap *item = NULL;
+    HASH_FIND_STR(dict->map,key,item);
+    return item;
+}
+
+//cleanup dictionary
+void clean(customType* dict){
+    UserDefinedTypeHashMap *item, *tmp;
+    HASH_ITER(hh, dict->map, item, tmp){
+        HASH_DEL(dict->map, item);
+        free(item);
+    }
+}
+
 //enums for code readablity
-enum {ValidNum, ValidFloat, ErrCode, ValidIdentifier, ValidSExpression, ValidQExpression, ValidFunction, ValidString}; //possible types
+enum {ValidNum, ValidFloat, ErrCode, ValidIdentifier, ValidSExpression, ValidQExpression, ValidFunction, ValidString, UserDefinedType}; //possible types
 
 //The following typedef allows us to have a 'function pointer' type; this is done to accomodate variable definitions and lookups
 typedef customType*(*funcPtr)(env*, customType*);
@@ -54,6 +91,9 @@ struct customType{
     customType* parameters; // pointer to list of function params
     customType* functionBody; //pointer to expression that represents the function body
 
+    //user defined type
+    UserDefinedTypeHashMap *map; //hashmap from field name to custom type
+    
     //generic expression type
     int count; //analogous to argc (count of tokens? (idk what else to call them))
     customType** block; //analogus to argv (vector of tokens? (idk what else to call them))
@@ -133,6 +173,23 @@ customType* typeLambda(customType* params, customType* body){
     return result;//return the created object
 
 } 
+
+//constructor for user defined data types
+customType* typeUser(customType* names, customType* values){
+    customType* result = malloc(sizeof(customType));
+    result->type=UserDefinedType;
+    if(names->count!=values->count){
+        return typeErr("mismatch between name and value numbers!!");
+    }
+    for(int i=0;i<names->count;i++){
+        if(names->block[i]->type!=ValidString){return typeErr("incorrect Type");}
+    }
+    for(int i=0;i<names->count;i++){
+        addItemToDictionary(names->block[i]->str,values->block[i],result);
+    }
+    return result;
+}
+
 customType* typeStr(char* str){
     customType* result = malloc(sizeof(customType*));//allocate memory for the object
     //set its type and value
@@ -185,7 +242,7 @@ void blockDel(customType* x){ //deletes list block and returns nothing
         case ValidString: free(x->str); break;
         case ValidIdentifier: free(x->id);break;
         //the above 2 cases find and free the apridriate fields of the object pointed to by the given pointer
-        
+        case UserDefinedType: clean(x);break;
         //the next case(s) uses a loid to free an entire list (all blocks reachable from the given pointer are freed)
         case ValidQExpression:
         case ValidSExpression:
