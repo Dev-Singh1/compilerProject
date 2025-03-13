@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include "mpc.h"
-#include "uthash.h"
 
 //apparently, according to official documentation, readline and addhistory are function that dont exist on windows 32 bit so i have to define an edgecase in which I make my own if I am compling on/for a 32 bit windows system
 #ifdef _WIN32
@@ -33,41 +32,8 @@ struct env;
 typedef struct customType customType;
 typedef struct env env;
 
-//dictionary support
-typedef struct {
-    char key[255];
-    customType* value;
-    UT_hash_handle hh;
-}UserDefinedTypeHashMap;
 
-//dictionary add
-void addItemToDictionary(const char* key, customType* val, customType* dict){
-    UserDefinedTypeHashMap *item = (UserDefinedTypeHashMap *)malloc(sizeof(UserDefinedTypeHashMap));
-    if(item==NULL){
-        printf("Failed to allocate Memory");
-        return;
-    }
-    strcpy(item->key);
-    item->value=val;
-    HASH_ADD_STR(dict->map,key,item);
-    return;
-}
 
-//dictionary get
-UserDefinedTypeHashMap* getItem(const char* key, customType* dict){
-    UserDefinedTypeHashMap *item = NULL;
-    HASH_FIND_STR(dict->map,key,item);
-    return item;
-}
-
-//cleanup dictionary
-void clean(customType* dict){
-    UserDefinedTypeHashMap *item, *tmp;
-    HASH_ITER(hh, dict->map, item, tmp){
-        HASH_DEL(dict->map, item);
-        free(item);
-    }
-}
 
 //enums for code readablity
 enum {ValidNum, ValidFloat, ErrCode, ValidIdentifier, ValidSExpression, ValidQExpression, ValidFunction, ValidString, UserDefinedType}; //possible types
@@ -91,8 +57,8 @@ struct customType{
     customType* parameters; // pointer to list of function params
     customType* functionBody; //pointer to expression that represents the function body
 
-    //user defined type
-    UserDefinedTypeHashMap *map; //hashmap from field name to custom type
+    //struct entries
+    customType* entrys; 
     
     //generic expression type
     int count; //analogous to argc (count of tokens? (idk what else to call them))
@@ -175,18 +141,12 @@ customType* typeLambda(customType* params, customType* body){
 } 
 
 //constructor for user defined data types
-customType* typeUser(customType* names, customType* values){
+customType* typeUser(char* name, customType* values){
     customType* result = malloc(sizeof(customType));
     result->type=UserDefinedType;
-    if(names->count!=values->count){
-        return typeErr("mismatch between name and value numbers!!");
-    }
-    for(int i=0;i<names->count;i++){
-        if(names->block[i]->type!=ValidString){return typeErr("incorrect Type");}
-    }
-    for(int i=0;i<names->count;i++){
-        addItemToDictionary(names->block[i]->str,values->block[i],result);
-    }
+    result->e=newEnv();
+    result->id=name;
+    result->entrys=def(result->e,values);
     return result;
 }
 
@@ -922,7 +882,40 @@ customType* def(env* e, customType* arg){
     blockDel(arg);
     return blockCons();
 }
+//WIP
+customType* defStruct(env* e, customType* arg){
+    if(arg->type!=ValidQExpression){
+        return typeErr("defStruct passed incorrect type!");
+    }
+    // the first argument passed to defStruct is the name of the struct to define
+    char* name = arg-block[0];
+    // the second argument passed to defStruct is the list of identifiers to define
+    customType* vars = arg->block[1];
 
+    for(int i=0;i<vars->count;i++){
+        if(vars->block[i]->type!=ValidIdentifier){
+            return typeErr("can only assign values to identifiers!");
+        }
+    }
+
+    //ensure that number of provided names matches the number of provided values
+    if(vars->count!=arg->count-1){
+        return typeErr("incorrect number of identifies and values");
+    }
+    customType* result = typeStr();
+    customType* temp = blockCons();
+    //add all name value pairs to the result list;
+    for(int i=0;i<vars->count;i++){
+        temp=cons(e,typeStr(vars->block[i]->id),arg->block[i+1]);
+        result=cons(e,result,temp);
+
+    }
+
+    blockDel(arg);
+    blockDel(temp);
+    return list(e,result);
+}
+//END_WIP
 //builtin function for printing all names in an enviorment
 customType* printCurrentEnv(env* e){
     for(int i=0;i<e->count;i++){
@@ -1171,6 +1164,12 @@ void stringHelper(customType* s){
     printf("\"%s\"",result);
     free(result);
 }
+void testStringHelper(customType* s){
+    char* result= malloc(sizeof(s->str)+1);
+    strcpy(result,s->str);
+    result=mpcf_escape(result);
+    return result;
+}
 void extendedPrintf(customType* s){
     switch (s->type){
         case ValidNum: printf("%li", s->num); break;
@@ -1183,6 +1182,23 @@ void extendedPrintf(customType* s){
                 printf('<Builtin Function>'); break;
             }else{
                 printf('<User Defined Function>'); break;
+            }
+        case ValidSExpression: exprPrint(s,'(',')'); break;
+        case ValidQExpression: exprPrint(s,'{','}'); break;
+    }
+}
+char* testPrintf(customType* s){
+    switch (s->type){
+        case ValidNum: return ("%li", s->num); break;
+        case ValidFloat: return ("%d",s->flnum); break;
+        case ErrCode: return ("%s",s->err); break;
+        case ValidString: testStringHelper(s); break;
+        case ValidIdentifier: return ("%s",s->id); break;
+        case ValidFunction:
+            if(s->func !=NULL){
+                return ('<Builtin Function>'); break;
+            }else{
+                return ('<User Defined Function>'); break;
             }
         case ValidSExpression: exprPrint(s,'(',')'); break;
         case ValidQExpression: exprPrint(s,'{','}'); break;
