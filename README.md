@@ -1,6 +1,8 @@
 ### README 
 
-# Lisp-Inspired Compiler
+# WORK IN PROGRESS
+
+# Lisp-Inspired Compiler (Systems Programming Project)
 
 This project is a custom compiler for a simple programming language inspired by the syntax and principles of ANSI Common Lisp. The language is designed to be expression-oriented and supports a rich set of features, including functional programming constructs, dynamic scoping, and various primitive operations.
 
