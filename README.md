@@ -1,6 +1,6 @@
 ### README 
 
-# WORK IN PROGRESS
+# WORK IN PROGRESS 
 
 # Lisp-Inspired Compiler (Systems Programming Project)
 
@@ -97,7 +97,7 @@ This project is a custom compiler for a simple programming language inspired by 
   - Converts input into Abstract Syntax Trees (ASTs).
 
 ## Roadmap
-
+- [ ] Fix all syntax and formatting errors 
 - [ ] Implement loops and iteration constructs.
 - [ ] Add file I/O operations.
 - [ ] Improve error handling
