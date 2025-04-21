@@ -543,7 +543,7 @@ void show(env* e, customType* lst){
 }
 
 customType* head(env* e, customType* lst){ //equivalent to car
-    if(lst->type==ValidString){char* x=(char*)lst->str[0];blockDel(lst);return typeStr(x);}
+    if(lst->type==ValidString){char x=lst->str[0];blockDel(lst);return typeStr(&x);}
     //base cases that causes errors
     if(lst->count!=1){blockDel(lst); return typeErr("Too many arguments given to head function");}
     if(lst->type != ValidQExpression){blockDel(lst); return typeErr("head function can only iderate on Qexpressions!");}
@@ -911,43 +911,51 @@ customType* def(env* e, customType* arg){
     return blockCons();
 }
 //WIP
-customType* defStruct(env* e, customType* arg){
-    if(arg->type!=ValidQExpression){
-        return typeErr("defStruct passed incorrect type!");
-    }
+//customType* defStruct(env* e, customType* arg){
+    //if(arg->type!=ValidQExpression){
+        //return typeErr("defStruct passed incorrect type!");
+    //}
     // the first argument passed to defStruct is the name of the struct to define
-    char* name = arg->block[0];
+    //char* name = arg->block[0];
     // the second argument passed to defStruct is the list of identifiers to define
-    customType* vars = arg->block[1];
+    //customType* vars = arg->block[1];
 
-    for(int i=0;i<vars->count;i++){
-        if(vars->block[i]->type!=ValidIdentifier){
-            return typeErr("can only assign values to identifiers!");
-        }
-    }
+    //for(int i=0;i<vars->count;i++){
+        //if(vars->block[i]->type!=ValidIdentifier){
+            //return typeErr("can only assign values to identifiers!");
+        //}
+    //}
 
     //ensure that number of provided names matches the number of provided values
-    if(vars->count!=arg->count-1){
-        return typeErr("incorrect number of identifies and values");
-    }
-    customType* result = typeStr("");
-    customType* temp = blockCons();
+    //if(vars->count!=arg->count-1){
+        //return typeErr("incorrect number of identifies and values");
+    //}
+    //customType* result = typeStr("");
+    //customType* temp = blockCons();
     //add all name value pairs to the result list;
-    for(int i=0;i<vars->count;i++){
-        temp=cons(e,typeStr(vars->block[i]->id),arg->block[i+1]);
-        result=cons(e,result,temp);
+    //for(int i=0;i<vars->count;i++){
+        //temp=cons(e,typeStr(vars->block[i]->id),arg->block[i+1]);
+        //result=cons(e,result,temp);
 
-    }
+    //}
 
-    blockDel(arg);
-    blockDel(temp);
-    return list(e,result);
-}
+    //blockDel(arg);
+    //blockDel(temp);
+    //return list(e,result);
+//}
 //END_WIP
 //builtin function for printing all names in an enviorment
 customType* printCurrentEnv(env* e){
     for(int i=0;i<e->count;i++){
-        printf("%s : %d",e->ids[i],e->values[i]);
+	switch(e->values[i]->type){
+	    case ValidNum:
+        	printf("%s : %ld",e->ids[i],e->values[i]->num);
+		break;
+            case ValidFloat:
+        	printf("%s : %f",e->ids[i],e->values[i]->flnum);
+		break;
+
+	}
     }
     return blockCons();
 }
@@ -1144,7 +1152,7 @@ customType* readAll(mpc_ast_t* tree){
     if(!strcmp(tree->tag,"qexpr")){list = qExprCons();}
     //then fill that list
     for(int i=0;i<tree->children_num;i++){
-        if(!strcmp(tree->children[i],"regex") || !strcmp(tree->children[i],"(") || !strcmp(tree->children[i],")") || !strcmp(tree->children[i],"{") || !strcmp(tree->children[i],"}") || strstr(tree->children[i]->tag,"comment") ){continue;} //certain tokens are not syntatically meaningful and should be ignored
+        if(!strcmp(tree->children[i]->tag,"regex") || !strcmp(tree->children[i]->contents,"(") || !strcmp(tree->children[i]->contents,")") || !strcmp(tree->children[i]->contents,"{") || !strcmp(tree->children[i]->contents,"}") || strstr(tree->children[i]->tag,"comment") ){continue;} //certain tokens are not syntatically meaningful and should be ignored
         list = concatinate(list, readAll(tree->children[i])); // helper fucntion that helps fill the list (add elements to the lsit)
     }
     return blockCons();
@@ -1194,16 +1202,16 @@ void stringHelper(customType* s){
     printf("\"%s\"",result);
     free(result);
 }
-void testStringHelper(customType* s){
-    char* result= malloc(sizeof(s->str)+1);
-    strcpy(result,s->str);
-    result=mpcf_escape(result);
-    return result;
-}
+//void testStringHelper(customType* s){
+    //char* result= malloc(sizeof(s->str)+1);
+    //strcpy(result,s->str);
+    //result=mpcf_escape(result);
+    //return result;
+//}
 void extendedPrintf(customType* s){
     switch (s->type){
         case ValidNum: printf("%li", s->num); break;
-        case ValidFloat: printf("%d",s->flnum); break;
+        case ValidFloat: printf("%f",s->flnum); break;
         case ErrCode: printf("Error: %s",s->err); break;
         case ValidString: stringHelper(s); break;
         case ValidIdentifier: printf("%s",s->id); break;
@@ -1217,25 +1225,25 @@ void extendedPrintf(customType* s){
         case ValidQExpression: exprPrint(s,'{','}'); break;
     }
 }
-char* testPrintf(customType* s){
-    char* result = malloc(sizeof(float));
-    switch (s->type){
-        case ValidNum: return ("%li", s->num); break;
-        case ValidFloat: gcvt(s->flnum,5,result); return result; break;
-        case ErrCode: return ("%s",s->err); break;
-        case ValidString: testStringHelper(s); break;
-        case ValidIdentifier: return ("%s",s->id); break;
-        case ValidFunction:
-            if(s->func !=NULL){
-                return ("<Builtin Function>"); break;
-            }else{
-                return ("<User Defined Function>"); break;
-            }
-        case ValidSExpression: exprPrint(s,'(',')'); break;
-        case ValidQExpression: exprPrint(s,'{','}'); break;
-    }
-    return result;
-}
+//char* testPrintf(customType* s){
+    //char* result = malloc(sizeof(float));
+    //switch (s->type){
+        //case ValidNum: return ("%li", s->num); break;
+        //case ValidFloat: gcvt(s->flnum,5,result); return result; break;
+        //case ErrCode: return ("%s",s->err); break;
+        //case ValidString: testStringHelper(s); break;
+        //case ValidIdentifier: return ("%s",s->id); break;
+        //case ValidFunction:
+            //if(s->func !=NULL){
+                //return ("<Builtin Function>"); break;
+            //}else{
+                //return ("<User Defined Function>"); break;
+            //}
+        //case ValidSExpression: exprPrint(s,'(',')'); break;
+        //case ValidQExpression: exprPrint(s,'{','}'); break;
+    //}
+    //return result;
+//}
 void extendedPrintln(customType* s){extendedPrintf(s); putchar('\n');}
 
 //forward declaration of parser pointers
@@ -1297,9 +1305,9 @@ void builtinFunctionAdd(env* e){
     builtinFunctionAddHelper(e, "tail", tail);
     builtinFunctionAddHelper(e, "eval", evalQexpr);
     builtinFunctionAddHelper(e, "join", join);
-    builtinFunctionAddHelper(e, "cons", cons);
+    //builtinFunctionAddHelper(e, "cons", cons);
     builtinFunctionAddHelper(e, "init", init);
-    builtinFunctionAddHelper(e, "len", len);
+    //builtinFunctionAddHelper(e, "len", len);
     builtinFunctionAddHelper(e, "def", def);
     builtinFunctionAddHelper(e, "/", myDivide);
     builtinFunctionAddHelper(e, "*", mul);
@@ -1310,7 +1318,7 @@ void builtinFunctionAdd(env* e){
     builtinFunctionAddHelper(e, "static", global);
     builtinFunctionAddHelper(e, "let", let);
     builtinFunctionAddHelper(e, "if", ifFunction);
-    builtinFunctionAddHelper(e, "==", eq);
+    //builtinFunctionAddHelper(e, "==", eq);
     builtinFunctionAddHelper(e, "!=", neq);
     builtinFunctionAddHelper(e, ">=", geq);
     builtinFunctionAddHelper(e, ">", gt);
@@ -1319,7 +1327,7 @@ void builtinFunctionAdd(env* e){
     builtinFunctionAddHelper(e, "load", load);
     builtinFunctionAddHelper(e, "print", printBuiltin);
     builtinFunctionAddHelper(e, "error", errorBuiltin);
-    builtinFunctionAddHelper(e,"show",show);
+    //builtinFunctionAddHelper(e,"show",show);
     //builtinFunctionAddHelper(e,"read",read);
 }
 
