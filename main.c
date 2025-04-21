@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <math.h>
 #include "mpc.h"
-
-//apparently, according to official documentation, readline and addhistory are function that dont exist on windows 32 bit so i have to define an edgecase in which I make my own if I am compling on/for a 32 bit windows system
+//apparently, according to official documentation, readline and addhistory are function that dont exist on windows 32 bit so i have to define an edgecase in which I make my own if I am compiling on/for a 32 bit windows system
 #ifdef _WIN32
 
 static char buffer[2048];
@@ -22,6 +22,7 @@ void add_history(char* unused) {}
 
 #else
 #include <editline/readline.h>
+#include <stdbool.h>
 #include <editline/history.h>
 #endif
 
@@ -31,6 +32,23 @@ struct customType;
 struct env;
 typedef struct customType customType;
 typedef struct env env;
+env* newEnv(void);
+customType* def(env* e, customType* arg);
+void delEnv(env* e);
+customType* blkCopy(customType* target);
+env* envCopy(env* e);
+customType* sexprEvalHelper(env* e, customType* root);
+customType* callFunction(env* e, customType* f, customType* args);
+customType* joinHelper(env* e, customType* x, customType* y);
+customType* concatinate(customType* l1, customType* l2);
+customType* readAll(mpc_ast_t* tree);
+customType* myDivide(env* e, customType* a);
+void envAdd(env* e, customType* x, customType* y);
+customType* defStruct(env* e, customType* arg);
+customType* envAddHelper(env* e, customType* arg, char* f);
+void extendedPrintf(customType* s);
+
+
 
 
 
@@ -116,7 +134,7 @@ customType* typeIdentifier(char* x){
     //set its type and value
     result->type = ValidIdentifier;
     result->id = malloc(strlen(x)+1);
-    strpy(result->id, x);
+    strcpy(result->id, x);
     return result;//return the created object
 }
 
@@ -202,7 +220,10 @@ void blockDel(customType* x){ //deletes list block and returns nothing
         case ValidString: free(x->str); break;
         case ValidIdentifier: free(x->id);break;
         //the above 2 cases find and free the apridriate fields of the object pointed to by the given pointer
-        case UserDefinedType: clean(x);break;
+        
+	//WIP
+	//case UserDefinedType: clean(x);break;
+
         //the next case(s) uses a loid to free an entire list (all blocks reachable from the given pointer are freed)
         case ValidQExpression:
         case ValidSExpression:
@@ -230,7 +251,7 @@ customType* blkCopy(customType* target){
                 break;
             }else{
                 result->func = NULL;
-                result->e = blkCopy(target->e);
+                result->e = envCopy(target->e);
                 result->parameters =blkCopy(target->parameters);
                 result->functionBody = blkCopy(target->functionBody);
                 break;
@@ -263,7 +284,7 @@ env* newEnv(void){
     return e; //return the enviorment object
 }
 
-env* delEnv(env* e){
+void delEnv(env* e){
     //in the given enviornment, loop over all variables and identifiers stored in the enviornmnet and free them
     for(int i=0;i<e->count;i++){
         free(e->ids[i]);
@@ -300,7 +321,7 @@ void envAdd(env* e, customType* x, customType* y){
     e->values = realloc(e->values, sizeof(customType*) * e->count);
     e->ids = realloc(e->ids, sizeof(char*) * e->count);
 
-    e->values[e->count-1] = lval_copy(y);
+    e->values[e->count-1] = blkCopy(y);
     e->ids[e->count-1] = malloc(strlen(x->id)+1);
     strcpy(e->ids[e->count-1], x->id);
 
@@ -391,7 +412,7 @@ customType* sexprEvalHelper(env* e, customType* root){
    if(first->type!=ValidFunction){blockDel(first); blockDel(root); return typeErr("Expresion does not begin with a valid identifier/command");}
    
    //assuming that the first element is a valid command and/or identifier, we may compute it, free the memory that is no longer need and return the result
-   customType* result = callFunction(e, f, root);
+   customType* result = callFunction(e, first, root);
    blockDel(first);
    return result;
 
@@ -512,7 +533,7 @@ customType* arithmaticHelper(env* e, customType* args, char* id){
 
 //builtin functions
 void show(env* e, customType* lst){
-    lst->str[strlen(str->lst)-1]='\0';
+   lst->str[strlen(lst->str)-1]='\0';
    char* result = malloc(strlen(lst->str+1)+1);
    strcpy(result,lst->str+1);
    result = mpcf_unescape(result);
@@ -522,7 +543,7 @@ void show(env* e, customType* lst){
 }
 
 customType* head(env* e, customType* lst){ //equivalent to car
-    if(lst->type==ValidString){char x=lst->str[0];blockDel(lst);return x;}
+    if(lst->type==ValidString){char* x=(char*)lst->str[0];blockDel(lst);return typeStr(x);}
     //base cases that causes errors
     if(lst->count!=1){blockDel(lst); return typeErr("Too many arguments given to head function");}
     if(lst->type != ValidQExpression){blockDel(lst); return typeErr("head function can only iderate on Qexpressions!");}
@@ -536,7 +557,7 @@ customType* head(env* e, customType* lst){ //equivalent to car
     return result;
 }
 customType* tail(env* e, customType* lst){ //equivalent to cdr
-    if(lst->type==ValidString){char* x=malloc(sizeof(lst->str));strncpy(x,lst->str+1,strlen(lst->str)-1);x[strlen(lst->str)-1]='\0';blockDel(lst);return x;}
+    if(lst->type==ValidString){char* x=malloc(sizeof(lst->str));strncpy(x,lst->str+1,strlen(lst->str)-1);x[strlen(lst->str)-1]='\0';blockDel(lst);return typeStr(x);}
     //base cases that causes errors
     if(lst->count!=1){blockDel(lst);return typeErr("Too many arguments passed to tail!");}
     if(lst->type!=ValidQExpression){blockDel(lst);return typeErr("tail can only iderate on QExpressions");}
@@ -604,7 +625,7 @@ customType* cons(env* e, customType* x, customType* y){
     if(y->type!=ValidQExpression){blockDel(x); blockDel(y); return typeErr("cons joins a value to a qexpr, you must pass a qexpr");}
     
     //create a new qexpr
-    customType* result;
+    customType* result=qExprCons();
     result->type = ValidQExpression;
 
     //x is the first element of result
@@ -616,12 +637,13 @@ customType* cons(env* e, customType* x, customType* y){
 int len(env* e, customType* lst){
     return lst->count;
 }
-customType* read(customType* s){
-    if(s->type!=ValidString){blockDel(s);return typeErr("excpected string");}
-    mpc_result_t ast;
-    mpc_parse("input",s->str,Program, &ast);
-    return readAll(ast.output);
-}
+//WIP
+//customType* read(customType* s){
+    //if(s->type!=ValidString){blockDel(s);return typeErr("excpected string");}
+    //mpc_result_t ast;
+    //mpc_parse("input",s->str,Program, &ast);
+    //return readAll(ast.output);
+//}
 customType* init(env* e, customType* lst){
     //base cases that causes errors
     if(lst->count!=1){blockDel(lst);return typeErr("Too many arguments passed to init!");}
@@ -648,126 +670,131 @@ customType* mul(env* e, customType* a) {
   return arithmaticHelper(e, a, "*");
 }
 
-customType* div(env* e, customType* a) {
+customType* myDivide(env* e, customType* a) {
   return arithmaticHelper(e, a, "/");
 }
 customType* mod(env* e, customType* a) {
   return arithmaticHelper(e, a, "%%");
 }
 //comparison operator builtins
-customType* geq(env e* customType* args){
+customType* geq(env *e, customType* args){
     if(args->count!=2){blockDel(args);return typeErr("incorrect number of arguments");}
     customType* first = args->block[0];
     customType* second = args->block[1];
     //switch case to match types and return appropriate values
+    int x;
     switch(first->type){
         case ValidNum:
             switch(second->type){
-                case ValidNum:int x = first->num >= second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
-                case ValidFloat: int x = first->num >= second->flnum; blockDel(first); blockDel(second); blockDel(args);  return typeNum(x);
+                case ValidNum:x = first->num >= second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: x = first->num >= second->flnum; blockDel(first); blockDel(second); blockDel(args);  return typeNum(x);
                 default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
             }break;
         case ValidFloat:
             switch(second->type){
-                case ValidNum: int x = first->flnum >= second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
-                case ValidFloat: int x = first->flnum >= second->flnum; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidNum: x = first->flnum >= second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: x = first->flnum >= second->flnum; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
                 default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
             }break;
-        default: blockDel(first); blockDel(second); blockDel(args); reutrn typeErr("incorrect arguements");
+        default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect arguements");
     }
 }
-customType* gt(env e* customType* args){
+customType* gt(env *e, customType* args){
     if(args->count!=2){blockDel(args);return typeErr("incorrect number of arguments");}
     customType* first = args->block[0];
     customType* second = args->block[1];
     //switch case to match types and return appropriate values
+    int x;
     switch(first->type){
         case ValidNum:
             switch(second->type){
-                case ValidNum:int x = first->num > second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
-                case ValidFloat: int x = first->num > second->flnum; blockDel(first); blockDel(second); blockDel(args);  return typeNum(x);
+                case ValidNum:x = first->num > second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: x = first->num > second->flnum; blockDel(first); blockDel(second); blockDel(args);  return typeNum(x);
                 default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
             }break;
         case ValidFloat:
             switch(second->type){
-                case ValidNum: int x = first->flnum > second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
-                case ValidFloat: int x = first->flnum > second->flnum; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidNum: x = first->flnum > second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: x = first->flnum > second->flnum; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
                 default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
             }break;
-        default: blockDel(first); blockDel(second); blockDel(args); reutrn typeErr("incorrect arguements");
+        default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect arguements");
     }
 }
-customType* leq(env e* customType* args){
+customType* leq(env *e, customType* args){
     if(args->count!=2){blockDel(args);return typeErr("incorrect number of arguments");}
     customType* first = args->block[0];
     customType* second = args->block[1];
     //switch case to match types and return appropriate values
+    int x;
     switch(first->type){
         case ValidNum:
             switch(second->type){
-                case ValidNum:int x = first->num <= second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
-                case ValidFloat: int x = first->num <= second->flnum; blockDel(first); blockDel(second); blockDel(args);  return typeNum(x);
+                case ValidNum:x = first->num <= second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: x = first->num <= second->flnum; blockDel(first); blockDel(second); blockDel(args);  return typeNum(x);
                 default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
             }break;
         case ValidFloat:
             switch(second->type){
-                case ValidNum: int x = first->flnum <= second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
-                case ValidFloat: int x = first->flnum <= second->flnum; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidNum: x = first->flnum <= second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: x = first->flnum <= second->flnum; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
                 default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
             }break;
-        default: blockDel(first); blockDel(second); blockDel(args); reutrn typeErr("incorrect arguements");
+        default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect arguements");
     }
 }
-customType* lt(env e* customType* args){
+customType* lt(env *e, customType* args){
     if(args->count!=2){blockDel(args);return typeErr("incorrect number of arguments");}
     customType* first = args->block[0];
     customType* second = args->block[1];
     //switch case to match types and return appropriate values
+    int x;
     switch(first->type){
         case ValidNum:
             switch(second->type){
-                case ValidNum:int x = first->num < second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
-                case ValidFloat: int x = first->num < second->flnum; blockDel(first); blockDel(second); blockDel(args);  return typeNum(x);
+                case ValidNum:x = first->num < second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: x = first->num < second->flnum; blockDel(first); blockDel(second); blockDel(args);  return typeNum(x);
                 default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
             }break;
         case ValidFloat:
             switch(second->type){
-                case ValidNum: int x = first->flnum < second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
-                case ValidFloat: int x = first->flnum < second->flnum; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidNum: x = first->flnum < second->num; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
+                case ValidFloat: x = first->flnum < second->flnum; blockDel(first); blockDel(second); blockDel(args); return typeNum(x);
                 default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect argumetns");
             }break;
-        default: blockDel(first); blockDel(second); blockDel(args); reutrn typeErr("incorrect arguements");
+        default: blockDel(first); blockDel(second); blockDel(args); return typeErr("incorrect arguements");
     }
 }
 
 customType* eq(env* e, customType* first, customType* second){
     //switch case to match types and return appropriate values
+    int x;
     switch(first->type){
         case ValidNum:
             switch(second->type){
-                case ValidNum:int x = first->num == second->num; blockDel(first); blockDel(second);  return typeNum(x);
-                case ValidFloat: int x = first->num == second->flnum; blockDel(first); blockDel(second);  return typeNum(x);
+                case ValidNum:x = first->num == second->num; blockDel(first); blockDel(second);  return typeNum(x);
+                case ValidFloat: x = first->num == second->flnum; blockDel(first); blockDel(second);  return typeNum(x);
                 default: blockDel(first); blockDel(second); return typeNum(0);
             }break;
         case ValidFloat:
             switch(second->type){
-                case ValidNum: int x = first->flnum == second->num; blockDel(first); blockDel(second); return typeNum(x);
-                case ValidFloat: int x = first->flnum == second->flnum; blockDel(first); blockDel(second); return typeNum(x);
+                case ValidNum: x = first->flnum == second->num; blockDel(first); blockDel(second); return typeNum(x);
+                case ValidFloat: x = first->flnum == second->flnum; blockDel(first); blockDel(second); return typeNum(x);
                 default: blockDel(first); blockDel(second); return typeNum(0);
             }break;
         case ErrCode:
             switch(second->type){
-                case ErrCode: int x = (strcmp(first->err,second->err)==0); blockDel(first); blockDel(second); return typeNum(x); 
+                case ErrCode: x = (strcmp(first->err,second->err)==0); blockDel(first); blockDel(second); return typeNum(x); 
                 default: blockDel(first); blockDel(second); return typeNum(0);
             }break;
         case ValidIdentifier:
             switch(second->type){
-                case ValidIdentifier: int x = (strcmp(first->id,second->id)==0); blockDel(first); blockDel(second); return typeNum(x); 
+                case ValidIdentifier: x = (strcmp(first->id,second->id)==0); blockDel(first); blockDel(second); return typeNum(x); 
                 default: blockDel(first); blockDel(second); return typeErr("inccrrect argumetns");
             }break;
         case ValidString:
             switch(second->type){
-                case ValidString: int x = (strcmp(first->str,second->str)==0); blockDel(first); blockDel(second); return typeNum(x); 
+                case ValidString: x = (strcmp(first->str,second->str)==0); blockDel(first); blockDel(second); return typeNum(x); 
                 default: blockDel(first); blockDel(second); return typeNum(0);
             }break;
         case ValidFunction:
@@ -786,7 +813,7 @@ customType* eq(env* e, customType* first, customType* second){
         case ValidSExpression:
             if(first->count != second->count){blockDel(first); blockDel(second); return typeNum(0);}
             for (int i = 0; i < first->count; i++){
-                if(!(eq(first->block[i],second->block[i]))){blockDel(first); blockDel(second); return typeNum(0);}
+                if(!(eq(e,first->block[i],second->block[i]))){blockDel(first); blockDel(second); return typeNum(0);}
             }
             blockDel(first); blockDel(second); return typeNum(1);
         break;
@@ -796,7 +823,7 @@ customType* eq(env* e, customType* first, customType* second){
 }
 customType* neq(env* e, customType* args){
     if(args->count!=2){return typeErr("incorrect number of arguments");}
-    customType* answer = eq(e,args-block[0],args->block[1]);
+    customType* answer = eq(e,args->block[0],args->block[1]);
     blockDel(args);
     switch(answer->type){
         case ErrCode: return answer;
@@ -816,6 +843,7 @@ customType* notFunction(env* e, customType* args ){
         case 0: blockDel(args); return typeNum(1);
         case 1: blockDel(args); return typeNum(0);
     }
+    return blockCons();
 
 }
 
@@ -828,7 +856,7 @@ customType* andFunction(env* e, customType* args){
     }
     //operates on bools (represented internally by numbers 0 and 1)
     int first=args->block[0]->num;
-    int second=arg->block[1]->num;
+    int second=args->block[1]->num;
     int answer = first && second;
     blockDel(args);
     return typeNum(answer);
@@ -843,7 +871,7 @@ customType* orFunction(env* e, customType* args){
     }
     //operates on bools (represented internally by numbers 0 and 1)
     int first=args->block[0]->num;
-    int second=arg->block[1]->num;
+    int second=args->block[1]->num;
     int answer = first || second;
     blockDel(args);
     return typeNum(answer);
@@ -876,7 +904,7 @@ customType* def(env* e, customType* arg){
 
     //add all name value pairs to the enviornment
     for(int i=0;i<vars->count;i++){
-        envAdd(e,vars->block[i]->id,arg->block[i+1]);
+        envAdd(e,vars->block[i],arg->block[i+1]);
     }
 
     blockDel(arg);
@@ -888,7 +916,7 @@ customType* defStruct(env* e, customType* arg){
         return typeErr("defStruct passed incorrect type!");
     }
     // the first argument passed to defStruct is the name of the struct to define
-    char* name = arg-block[0];
+    char* name = arg->block[0];
     // the second argument passed to defStruct is the list of identifiers to define
     customType* vars = arg->block[1];
 
@@ -902,7 +930,7 @@ customType* defStruct(env* e, customType* arg){
     if(vars->count!=arg->count-1){
         return typeErr("incorrect number of identifies and values");
     }
-    customType* result = typeStr();
+    customType* result = typeStr("");
     customType* temp = blockCons();
     //add all name value pairs to the result list;
     for(int i=0;i<vars->count;i++){
@@ -976,27 +1004,27 @@ customType* callFunction(env* e, customType* f, customType* args){
     if(f->func){return f->func(e,args);} //if builtin, simply call it
 
     //otherwise check the argument count and add parameters to the function enviorment and set the current enviorment as the parent enviorment of the funciton enviorment
-    while(arg->count){
-        if(f->parameters->count == 0){blockDel(arg); return typeErr("too many arguments passed");}
+    while(args->count){
+        if(f->parameters->count == 0){blockDel(args); return typeErr("too many arguments passed");}
         
         customType* name = pop(f->parameters,0);
-        if(!strcmp(name->id,'&')){ //if & is found, enter edge case of varible arguments
+        if(!strcmp(name->id,"'&'")){ //if & is found, enter edge case of varible arguments
             if(f->parameters->count!=1){
-                blockDel(arg); return typeErr("incorrect function format");
+                blockDel(args); return typeErr("incorrect function format");
             }
             customType* optionalArgument = pop(f->parameters,0);
             envAdd(f->e,optionalArgument,list(e,args));
             blockDel(name); blockDel(optionalArgument);
             break;
         }
-        customType* value = pop(a->parameters,0);
+        customType* value = pop(args->parameters,0);
         
         envAdd(f->e,name,value);
         blockDel(name);blockDel(value);
     }
     blockDel(args);
 
-    if(f->parameters->count > 0 && !strcmp(f->parameters->block[0]->id,'&')){
+    if(f->parameters->count > 0 && !strcmp(f->parameters->block[0]->id,"'&'")){
         if(f->parameters->count != 2){
             return typeErr("incorrect function format");
         }
@@ -1033,10 +1061,11 @@ customType* ifFunction(env* e, customType* args){
 
     }
     customType* ans;
-    switch(arg->block[0]->num){
-        case 1: ans=recursiveHelper(e,pop(arg,1)); blockDel(args); return ans;
-        case 0: ans=recursiveHelper(e,pop(arg,2)); blockDel(args); return ans;;
+    switch(args->block[0]->num){
+        case 1: ans=recursiveHelper(e,pop(args,1)); blockDel(args); return ans;
+        case 0: ans=recursiveHelper(e,pop(args,2)); blockDel(args); return ans;;
     }
+    return blockCons();
 }
 //builtin print for the language
 
@@ -1076,7 +1105,7 @@ customType* readNum(mpc_ast_t* tree){
 
 customType* readFloat(mpc_ast_t* tree){
     errno=0;
-    double x = strtof(tree->contents,NULL,10);
+    double x = strtof(tree->contents,NULL);
     return errno != ERANGE ? typeFloat(x) : typeErr("invalid number");
 }
 
@@ -1111,13 +1140,14 @@ customType* readAll(mpc_ast_t* tree){
 
     //if root of AST (>) or S expression, create an empty list
     customType* list = NULL;
-    if(!strcmp(t->tag,">") | strstr(t->tag,"sexpr")){list = sExprCons();}
+    if(!strcmp(tree->tag,">") || strstr(tree->tag,"sexpr")){list = blockCons();}
     if(!strcmp(tree->tag,"qexpr")){list = qExprCons();}
     //then fill that list
     for(int i=0;i<tree->children_num;i++){
-        if(!strcmp(tree->childern[i],"regex") | !strcmp(tree->childern[i],"(") | !strcmp(tree->childern[i],")" | !strcmp(tree->childern[i],"{") | !strcmp(tree->childern[i],"}") | strstr(tree->children[i]->tag,"comment") ){continue;} //certain tokens are not syntatically meaningful and should be ignored
-        list = concatinate(list, readAll(tree->children[i])) // helper fucntion that helps fill the list (add elements to the lsit)
+        if(!strcmp(tree->children[i],"regex") || !strcmp(tree->children[i],"(") || !strcmp(tree->children[i],")") || !strcmp(tree->children[i],"{") || !strcmp(tree->children[i],"}") || strstr(tree->children[i]->tag,"comment") ){continue;} //certain tokens are not syntatically meaningful and should be ignored
+        list = concatinate(list, readAll(tree->children[i])); // helper fucntion that helps fill the list (add elements to the lsit)
     }
+    return blockCons();
     
 }
 customType* concatinate(customType* l1, customType* l2){// takes 2 pointers, one for the list to which the data is added and the other for the data itself
@@ -1179,30 +1209,32 @@ void extendedPrintf(customType* s){
         case ValidIdentifier: printf("%s",s->id); break;
         case ValidFunction:
             if(s->func !=NULL){
-                printf('<Builtin Function>'); break;
+                printf("<Builtin Function>"); break;
             }else{
-                printf('<User Defined Function>'); break;
+                printf("<User Defined Function>"); break;
             }
         case ValidSExpression: exprPrint(s,'(',')'); break;
         case ValidQExpression: exprPrint(s,'{','}'); break;
     }
 }
 char* testPrintf(customType* s){
+    char* result = malloc(sizeof(float));
     switch (s->type){
         case ValidNum: return ("%li", s->num); break;
-        case ValidFloat: return ("%d",s->flnum); break;
+        case ValidFloat: gcvt(s->flnum,5,result); return result; break;
         case ErrCode: return ("%s",s->err); break;
         case ValidString: testStringHelper(s); break;
         case ValidIdentifier: return ("%s",s->id); break;
         case ValidFunction:
             if(s->func !=NULL){
-                return ('<Builtin Function>'); break;
+                return ("<Builtin Function>"); break;
             }else{
-                return ('<User Defined Function>'); break;
+                return ("<User Defined Function>"); break;
             }
         case ValidSExpression: exprPrint(s,'(',')'); break;
         case ValidQExpression: exprPrint(s,'{','}'); break;
     }
+    return result;
 }
 void extendedPrintln(customType* s){extendedPrintf(s); putchar('\n');}
 
@@ -1245,7 +1277,7 @@ customType* load(env* e, customType* args){
         //Create new error message using it 
         customType* err = typeErr("Could not load Library %s", err_msg);
         free(err_msg);
-        blockDel(a);
+        blockDel(args);
 
         // Cleanup and return error 
         return err;
@@ -1269,7 +1301,7 @@ void builtinFunctionAdd(env* e){
     builtinFunctionAddHelper(e, "init", init);
     builtinFunctionAddHelper(e, "len", len);
     builtinFunctionAddHelper(e, "def", def);
-    builtinFunctionAddHelper(e, "/", div);
+    builtinFunctionAddHelper(e, "/", myDivide);
     builtinFunctionAddHelper(e, "*", mul);
     builtinFunctionAddHelper(e, "+", add);
     builtinFunctionAddHelper(e, "-", sub);
@@ -1288,7 +1320,7 @@ void builtinFunctionAdd(env* e){
     builtinFunctionAddHelper(e, "print", printBuiltin);
     builtinFunctionAddHelper(e, "error", errorBuiltin);
     builtinFunctionAddHelper(e,"show",show);
-    builtinFunctionAddHelper(e,"read",read);
+    //builtinFunctionAddHelper(e,"read",read);
 }
 
 int main(int argc, char** argv){
@@ -1307,17 +1339,17 @@ int main(int argc, char** argv){
     /* Define them with the following Language */
     //the definition of identifier in this context includes, not just arithmatic identifier, but funciton calls, conditionals, loops, etc. as well
     mpca_lang(MPCA_LANG_DEFAULT,
-        "                                                     \
+        "                                                    \
             number   : /-?[0-9]+/;                           \
-            string   : /\"(\\\\.|[^\"])*\"/ ;
-            float    : /-?[0-9]+.?[0-9]+/ \
-            identifier : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;   \
-            sexpr   : '(' <expr>* ')' \
-            qexpr   : '{' <expr>* '}' \
+            string   : /\\\"(\\\\\\\\.||[^\\\"])*\\\"/ ;               \
+            float    : /-?[0-9]+\\.?[0-9]+/;                   \
+            identifier : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;  \
+            sexpr   : '(' <expr>* ')';                        \
+            qexpr   : '{' <expr>* '}';                        \
             expr     : <number> | <float> | <sexpr> | <qexpr> | <comment> | <string> | <identifier> ;\
-            comment  : /;[^\\r\\n]*/ ; \
-            program    : /^/ <expr>* /$/ ;         \
-        ",
+            comment  : /;[^\\r\\n]*/ ;                       \
+            program    : /^/ <expr>* /$/ ;                   \
+	",
         Number, String, Float, Identifier, Sexpr, Qexpr, Expr, Comment, Program);
     
     env* e = newEnv();
@@ -1345,17 +1377,17 @@ int main(int argc, char** argv){
                 // if successfull, print the result of evaluating the ast
                 customType* output = recursiveHelper(e,readAll(ast.output));
                 extendedPrintf(output);
-                blockDel(output)
+                blockDel(output);
                 mpc_ast_delete(ast.output);
             }else{
-                mpc_ast_print(ast.error);
-                mpc_ast_delete(ast.error);
+                printf("%s:\n", mpc_err_string(ast.error));
+                mpc_err_delete(ast.error);
             }
             free(input);
         }
     }
     delEnv(e);
     /* Undefine and Delete our Parsers */
-    mpc_cleanup(9,Number,String,FLoat,Identifier,Sexpr,Qexpr,Expr,Comment,Program);
-    return 0
+    mpc_cleanup(9,Number,String,Float,Identifier,Sexpr,Qexpr,Expr,Comment,Program);
+    return 0;
 }
